@@ -5,6 +5,7 @@
 import sys
 import MySQLdb
 import argparse
+import re
 
 
 class argpar:
@@ -65,24 +66,73 @@ class check_data:
 
     def check_tables_num(self):
 
-        self.s_cursor.execute("select count(1) from information_schema.tables where table_schema='{s_dbname}'".format(
+        # self.s_cursor.execute("select count(1) from information_schema.tables where table_schema='{s_dbname}'".format(
+        self.s_cursor.execute("select table_name from information_schema.tables where table_schema='{s_dbname}'".format(
             s_dbname=self.s_dbname))
-        s_data = self.s_cursor.fetchone()
+        s_data = self.s_cursor.fetchall()
+        self.s_data_new = []
+        for i in s_data:
+            self.s_data_new.append(i[0].lower())
 
-        print('源库表数量：'+str(s_data[0]))
+        print("源库所包含表列表："+str(self.s_data_new))
+        # self.s_db_conn.close()
 
-        self.d_cursor.execute("select count(1) from information_schema.tables where table_schema='{d_dbname}'".format(
+
+        self.d_cursor.execute("select table_name from information_schema.tables where table_schema='{d_dbname}'".format(
             d_dbname=self.d_dbname))
-        d_data = self.d_cursor.fetchone()
-        print('目标库表数量：'+str(d_data[0]))
+        d_data = self.d_cursor.fetchall()
+        self.d_data_new = []
+        for i in d_data:
+            self.d_data_new.append(i[0].lower())
 
-        if s_data == d_data:
-            print("The number of tables in the database is equal")
+        print("目标库所包含表列表：" + str(self.d_data_new))
+        # self.d_db_conn.close()
+
+
+        if cmp(self.s_data_new,self.d_data_new) == 0:
+
+            print("The tables of the database is equal")
         else:
-            print("Attention,The number of tables in the database is not equal")
+            print("Attention,The tables of  database is not equal")
+
 
     def check_tables_structure(self):
-        self.s_cursor.execute("select table_name from information_schema.tables where table_schema='{s_dbname}' order by table_name".format(self.s_dbname))
+
+        s_strc_hash=[]
+        d_strc_hash=[]
+        self.s_data_new.sort()
+        self.d_data_new.sort()
+
+        # print self.s_data_new
+        # print self.d_data_new
+
+
+        for i in self.s_data_new:
+
+            self.s_cursor.execute("show create table %s" % i)
+            strc_table = self.s_cursor.fetchone()
+            strc_table_str = re.sub('\n|\s|`', '', strc_table[1]).lower()
+            strc_table_str_hash = hash(strc_table_str)
+            # print(strc_table_str_hash)
+            s_strc_hash.append(strc_table_str_hash)
+
+        for i in self.d_data_new:
+            self.d_cursor.execute("show create table %s" % i)
+            strc_table = self.d_cursor.fetchone()
+            strc_table_str = re.sub('\n|\s|`', '', strc_table[1]).lower()
+            strc_table_str_hash = hash(strc_table_str)
+            # print(strc_table_str_hash)
+            d_strc_hash.append(strc_table_str_hash)
+
+        if cmp(s_strc_hash,d_strc_hash):
+            print("The tables in the two databases has the same structrue")
+        else:
+            print("Attention,The tables in the two databases compared fail")
+
+
+    def check_table_rows(self):
+        pass
+
 
 
 
@@ -102,6 +152,7 @@ if __name__ == '__main__':
     check_data = check_data(s_cursor, s_db_conn, s_dbname, d_cursor, d_db_conn, d_dbname)
 
     check_data.check_tables_num()
+    check_data.check_tables_structure()
 
 
 
